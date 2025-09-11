@@ -19,6 +19,8 @@ import ai.chat2db.server.tools.common.model.Context;
 import ai.chat2db.server.tools.common.model.LoginUser;
 import ai.chat2db.server.tools.common.util.ContextUtils;
 import ai.chat2db.server.tools.common.util.I18nUtils;
+import ai.chat2db.server.web.start.config.security.ApiSecurityMiddleware;
+import ai.chat2db.server.web.start.config.validation.ValidationInterceptor;
 import cn.dev33.satoken.context.SaHolder;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaFoxUtil;
@@ -64,9 +66,25 @@ public class Chat2dbWebMvcConfigurer implements WebMvcConfigurer {
     private TeamUserService teamUserService;
     @Resource
     private Chat2dbProperties chat2dbProperties;
+    @Resource
+    private ApiSecurityMiddleware apiSecurityMiddleware;
+    @Resource
+    private ValidationInterceptor validationInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+
+        // Security middleware - primeira linha de defesa
+        registry.addInterceptor(apiSecurityMiddleware)
+            .order(0)
+            .addPathPatterns("/**")
+            .excludePathPatterns("/favicon.ico", "/error", "/static/**");
+
+        // Validation interceptor - segunda linha de defesa
+        registry.addInterceptor(validationInterceptor)
+            .order(1)
+            .addPathPatterns("/api/**")
+            .excludePathPatterns("/api/system/get-version-a", "/api/oauth/login_success", "/api/config/system_config");
 
         // All requests try to add user information
         registry.addInterceptor(new AsyncHandlerInterceptor() {
@@ -126,7 +144,7 @@ public class Chat2dbWebMvcConfigurer implements WebMvcConfigurer {
                     Dbutils.removeSession();
                 }
             })
-            .order(1)
+            .order(3)
             .addPathPatterns("/**")
             .excludePathPatterns(FRONT_PERMIT_ALL);
 
@@ -179,7 +197,7 @@ public class Chat2dbWebMvcConfigurer implements WebMvcConfigurer {
                     return true;
                 }
             })
-            .order(3)
+            .order(4)
             .addPathPatterns("/api/admin/**")
             .addPathPatterns("/admin/**")
         ;

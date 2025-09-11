@@ -1,0 +1,30 @@
+# Dockerfile para desenvolvimento
+FROM openjdk:17-jdk-slim
+
+# Instalar ferramentas de desenvolvimento
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    vim \
+    git \
+    maven \
+    && rm -rf /var/lib/apt/lists/*
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar código fonte (será sobrescrito por volume em desenvolvimento)
+COPY chat2db-server ./chat2db-server
+
+# Expor portas (aplicação + debug)
+EXPOSE 10824 5005
+
+# Comando para desenvolvimento (com debug habilitado)
+CMD ["java", \
+    "-Dloader.path=lib", \
+    "-Dspring.profiles.active=dev", \
+    "-Xmx1024m", \
+    "-Xms256m", \
+    "-XX:+UseG1GC", \
+    "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005", \
+    "-jar", "chat2db-server/chat2db-server-web-start/target/chat2db-server-web-start.jar"]

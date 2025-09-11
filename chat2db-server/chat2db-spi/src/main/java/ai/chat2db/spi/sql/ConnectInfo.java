@@ -14,6 +14,7 @@ import ai.chat2db.spi.config.DriverConfig;
 import ai.chat2db.spi.model.KeyValue;
 import ai.chat2db.spi.model.SSHInfo;
 import ai.chat2db.spi.model.SSLInfo;
+import ai.chat2db.spi.security.ConnectionSecurityManager;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 import lombok.extern.slf4j.Slf4j;
@@ -266,11 +267,53 @@ public class ConnectInfo {
 
     /**
      * Setter method for property <tt>password</tt>.
+     * Aplica criptografia automática para segurança
      *
      * @param password value to be assigned to property password
      */
     public void setPassword(String password) {
-        this.password = password;
+        try {
+            // Aplica criptografia se a senha não estiver vazia e não for já criptografada
+            if (password != null && !password.isEmpty() && !isPasswordEncrypted(password)) {
+                this.password = ConnectionSecurityManager.encryptPassword(password);
+                log.debug("Senha criptografada para conexão: {}", ConnectionSecurityManager.maskPassword(password));
+            } else {
+                this.password = password;
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao criptografar senha, usando valor original: {}", e.getMessage());
+            this.password = password;
+        }
+    }
+    
+    /**
+     * Obtém a senha descriptografada para uso em conexões
+     */
+    public String getDecryptedPassword() {
+        try {
+            if (password != null && isPasswordEncrypted(password)) {
+                return ConnectionSecurityManager.decryptPassword(password);
+            }
+            return password;
+        } catch (Exception e) {
+            log.warn("Erro ao descriptografar senha: {}", e.getMessage());
+            return password;
+        }
+    }
+    
+    /**
+     * Verifica se a senha está criptografada (formato Base64)
+     */
+    private boolean isPasswordEncrypted(String password) {
+        if (password == null || password.length() < 20) {
+            return false;
+        }
+        try {
+            java.util.Base64.getDecoder().decode(password);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /**
@@ -542,7 +585,8 @@ public class ConnectInfo {
         copy.setDatabaseName(this.getDatabaseName());
         copy.setSchemaName(this.getSchemaName());
         copy.setUser(this.getUser());
-        copy.setPassword(this.getPassword());
+        // Copia a senha já criptografada diretamente
+        copy.password = this.password;
         copy.setUrl(this.getUrl());
         copy.setAlias(this.getAlias());
         copy.setDataSourceId(this.getDataSourceId());
@@ -557,6 +601,14 @@ public class ConnectInfo {
         copy.setSid(this.getSid());
         copy.setUrlWithOutDatabase(this.getUrlWithOutDatabase());
         copy.setLastAccessTime(new Date());
+        
+        // Aplica validações de segurança na cópia
+        try {
+            ConnectionSecurityManager.validateConnectionInfo(copy);
+        } catch (Exception e) {
+            log.warn("Validação de segurança falhou na cópia da conexão: {}", e.getMessage());
+        }
+        
         return copy;
     }
 
@@ -585,7 +637,27 @@ public class ConnectInfo {
 
 
     public String getKey() {
-        return "loginUser:"+loginUser + "_dataSourceId:" + dataSourceId + "_databaseName:" + databaseName + "_schemaName:" + schemaName + "_consoleId:" + consoleId;
+        // Usa hash seguro para identificação única
+        try {
+            return ConnectionSecurityManager.generateConnectionHash(this);
+        } catch (Exception e) {
+            log.warn("Erro ao gerar hash seguro, usando método legado: {}", e.getMessage());
+            return "loginUser:"+loginUser + "_dataSourceId:" + dataSourceId + "_databaseName:" + databaseName + "_schemaName:" + schemaName + "_consoleId:" + consoleId;
+        }
+    }
+    
+    /**
+     * Verifica se a conexão é segura (SSL/TLS habilitado)
+     */
+    public boolean isSecureConnection() {
+        return ConnectionSecurityManager.isSecureConnection(this);
+    }
+    
+    /**
+     * Valida as informações de conexão contra ataques
+     */
+    public void validateSecurity() {
+        ConnectionSecurityManager.validateConnectionInfo(this);
     }
 
     public String getLoginUser() {

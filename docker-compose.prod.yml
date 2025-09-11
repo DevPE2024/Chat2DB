@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  chat2db-prod:
+    image: chat2db/chat2db:latest
+    container_name: chat2db-production
+    restart: unless-stopped
+    
+    # Configurações de recursos para produção
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Variáveis de ambiente para produção
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xmx1536m -Xms512m -XX:+UseG1GC
+      - TZ=America/Sao_Paulo
+    
+    # Volumes persistentes
+    volumes:
+      - chat2db_data:/root/.chat2db
+      - chat2db_logs:/app/logs
+    
+    # Portas
+    ports:
+      - "10824:10824"
+    
+    # Configurações de rede
+    networks:
+      - chat2db_network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10824/api/system/get-version-a"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Configurações de segurança
+    security_opt:
+      - no-new-privileges:true
+    
+    # Logs configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Volumes nomeados para persistência
+volumes:
+  chat2db_data:
+    driver: local
+  chat2db_logs:
+    driver: local
+
+# Rede personalizada
+networks:
+  chat2db_network:
+    driver: bridge

@@ -133,29 +133,57 @@ public class Dbutils {
     }
 
     /**
-     * Initialize data source
+     * Initialize data source with optimized HikariCP configuration
+     * Implementação otimizada do pool de conexões para melhor performance
      *
-     * @return
+     * @return DataSource configurado com HikariCP otimizado
      */
     private static DataSource initDataSource() {
         HikariDataSource dataSource = new HikariDataSource();
         String environment = StringUtils.defaultString(System.getProperty("spring.profiles.active"), "dev");
+        
+        // Configuração de URL baseada no ambiente
         if ("dev".equalsIgnoreCase(environment)) {
-            dataSource.setJdbcUrl("jdbc:h2:file:~/.chat2db/db/chat2db_dev;MODE=MYSQL");
-        }else if ("test".equalsIgnoreCase(environment)) {
-            dataSource.setJdbcUrl("jdbc:h2:file:~/.chat2db/db/chat2db_test;MODE=MYSQL");
-        }else {
-            dataSource.setJdbcUrl("jdbc:h2:~/.chat2db/db/chat2db;MODE=MYSQL;FILE_LOCK=NO");
+            dataSource.setJdbcUrl("jdbc:h2:file:~/.chat2db/db/chat2db_dev;MODE=MYSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
+        } else if ("test".equalsIgnoreCase(environment)) {
+            dataSource.setJdbcUrl("jdbc:h2:file:~/.chat2db/db/chat2db_test;MODE=MYSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
+        } else {
+            dataSource.setJdbcUrl("jdbc:h2:~/.chat2db/db/chat2db;MODE=MYSQL;FILE_LOCK=NO;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
         }
+        
+        // Configurações básicas do driver
         dataSource.setDriverClassName("org.h2.Driver");
-        dataSource.setIdleTimeout(60000);
-        dataSource.setAutoCommit(true);
-        dataSource.setMaximumPoolSize(500);
-        dataSource.setMinimumIdle(1);
-        dataSource.setMaxLifetime(60000 * 10);
+        dataSource.setPoolName("Chat2DB-HikariCP");
+        
+        // Configurações otimizadas do pool de conexões
+        dataSource.setMaximumPoolSize(50); // Reduzido de 500 para 50 (mais realista)
+        dataSource.setMinimumIdle(5); // Aumentado de 1 para 5 (melhor responsividade)
+        dataSource.setConnectionTimeout(30000); // 30 segundos timeout para obter conexão
+        dataSource.setIdleTimeout(300000); // 5 minutos idle timeout (aumentado)
+        dataSource.setMaxLifetime(1800000); // 30 minutos max lifetime (aumentado)
+        dataSource.setLeakDetectionThreshold(60000); // 1 minuto para detectar vazamentos
+        
+        // Configurações de validação e performance
         dataSource.setConnectionTestQuery("SELECT 1");
+        dataSource.setValidationTimeout(5000); // 5 segundos para validação
+        dataSource.setAutoCommit(true);
+        dataSource.setIsolateInternalQueries(true);
+        dataSource.setAllowPoolSuspension(false);
+        
+        // Configurações de cache e otimização
+        dataSource.addDataSourceProperty("cachePrepStmts", "true");
+        dataSource.addDataSourceProperty("prepStmtCacheSize", "250");
+        dataSource.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+        dataSource.addDataSourceProperty("useServerPrepStmts", "true");
+        dataSource.addDataSourceProperty("useLocalSessionState", "true");
+        dataSource.addDataSourceProperty("rewriteBatchedStatements", "true");
+        dataSource.addDataSourceProperty("cacheResultSetMetadata", "true");
+        dataSource.addDataSourceProperty("cacheServerConfiguration", "true");
+        dataSource.addDataSourceProperty("elideSetAutoCommits", "true");
+        dataSource.addDataSourceProperty("maintainTimeStats", "false");
+        
+        log.info("Pool de conexões HikariCP inicializado com configurações otimizadas - Ambiente: {}", environment);
         return dataSource;
-
     }
 
     /**

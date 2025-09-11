@@ -7,6 +7,7 @@ import ai.chat2db.spi.Plugin;
 import ai.chat2db.spi.SqlBuilder;
 import ai.chat2db.spi.config.DBConfig;
 import ai.chat2db.spi.config.DriverConfig;
+import ai.chat2db.spi.manager.DatabaseDriverManager;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
@@ -30,20 +31,36 @@ public class Chat2DBContext {
     public static Map<String, Plugin> PLUGIN_MAP = new ConcurrentHashMap<>();
 
     static {
+        // Mantém compatibilidade com código legado
         ServiceLoader<Plugin> s = ServiceLoader.load(Plugin.class);
         Iterator<Plugin> iterator = s.iterator();
         while (iterator.hasNext()) {
             Plugin plugin = iterator.next();
             PLUGIN_MAP.put(plugin.getDBConfig().getDbType(), plugin);
         }
+        
+        log.info("Chat2DBContext inicializado com {} plugins. Usando DatabaseDriverManager para gerenciamento avançado.", 
+            PLUGIN_MAP.size());
     }
 
     public static DriverConfig getDefaultDriverConfig(String dbType) {
-        return PLUGIN_MAP.get(dbType).getDBConfig().getDefaultDriverConfig();
+        // Usa o novo gerenciador com fallback para compatibilidade
+        try {
+            return DatabaseDriverManager.getDefaultDriverConfig(dbType);
+        } catch (Exception e) {
+            log.warn("Fallback para método legado para dbType: {}", dbType);
+            return PLUGIN_MAP.get(dbType).getDBConfig().getDefaultDriverConfig();
+        }
     }
 
     public static SqlBuilder getSqlBuilder() {
-        return PLUGIN_MAP.get(getConnectInfo().getDbType()).getMetaData().getSqlBuilder();
+        String dbType = getConnectInfo().getDbType();
+        try {
+            return DatabaseDriverManager.getPlugin(dbType).getMetaData().getSqlBuilder();
+        } catch (Exception e) {
+            log.warn("Fallback para método legado para getSqlBuilder: {}", dbType);
+            return PLUGIN_MAP.get(dbType).getMetaData().getSqlBuilder();
+        }
     }
 
     /**

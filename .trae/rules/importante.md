@@ -1,9 +1,6 @@
 
 ## 🎯 Regras de Prioridade de Desenvolvimento
 
-sempre escrever em português 
-
-
 ### 📋 **Ordem de Execução Obrigatória**
 
 #### 🚀 **Sequência de Desenvolvimento:**

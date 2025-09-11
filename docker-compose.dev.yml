@@ -1,11 +1,47 @@
-version: '3'
+version: '3.8'
+
 services:
-  chat2db:
+  chat2db-dev:
     image: chat2db/chat2db:latest
-    container_name: chat2db-dev
-    volumes:
-      - ~/.chat2db-docker:/root/.chat2db
-    ports:
-      - "10824:10824"
+    container_name: chat2db-development
+    restart: "no"
+    
+    # Variáveis de ambiente para desenvolvimento
     environment:
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx1024m -Xms256m -XX:+UseG1GC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+      - TZ=America/Sao_Paulo
+      - DEBUG=true
+    
+    # Volumes para desenvolvimento (bind mounts para hot-reload)
+    volumes:
+      - ~/.chat2db-docker:/root/.chat2db
+      - ./chat2db-server:/app/server:ro
+      - ./chat2db-client/dist:/app/client:ro
+      - ./logs:/app/logs
+    
+    # Portas (incluindo debug)
+    ports:
+      - "10824:10824"  # Aplicação
+      - "5005:5005"    # Debug Java
+      - "3000:3000"    # Frontend dev server (se necessário)
+    
+    # Configurações de rede
+    networks:
+      - chat2db_dev_network
+    
+    # Configurações para desenvolvimento
+    stdin_open: true
+    tty: true
+    
+    # Logs mais verbosos para desenvolvimento
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "2"
+
+# Rede para desenvolvimento
+networks:
+  chat2db_dev_network:
+    driver: bridge
